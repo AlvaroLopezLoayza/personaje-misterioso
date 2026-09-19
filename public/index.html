@@ -138,34 +138,34 @@ socket.on('connect', () => {
   });
 });
 
-let guessedThisRound = -1;
+let sentGuesses = 0;   // intentos ya enviados en la ronda actual
 socket.on('state', s => {
   const y = s.you;
-  $('meAv').innerHTML = avatarSVG(y.avatar, 'monito bounce');
+  setHTML($('meAv'), y.avatar, avatarSVG(y.avatar, 'monito bounce'));
   $('meName').textContent = y.name;
   $('meScore').textContent = y.score;
-  $('board').innerHTML = s.board.map((p, i) =>
+  setHTML($('board'), s.board.map(p => p.name + p.score).join('|'), s.board.map((p, i) =>
     '<div class="row"><b class="neon">' + (i + 1) + '</b><span class="mini">' + avatarSVG(p.avatar) +
-    '</span><span style="flex:1">' + p.name + '</span><b class="pix">' + p.score + '</b></div>').join('');
+    '</span><span style="flex:1">' + p.name + '</span><b class="pix">' + p.score + '</b></div>').join(''));
 
   const panel = $('panel');
 
   if (s.phase === 'lobby') {
     $('statusLine').textContent = 'Registrado. Espera a que el anfitrión inicie.';
-    panel.innerHTML = '<div class="big neon">LISTO</div><div class="muted">Mira la pantalla grande</div>';
+    setHTML(panel, 'lobby', '<div class="big neon">LISTO</div><div class="muted">Mira la pantalla grande</div>');
     return;
   }
 
   if (s.phase === 'final') {
     $('statusLine').textContent = 'Juego terminado';
-    panel.innerHTML = '<div class="big fire">GANADOR</div><div class="big">' +
-      (s.winner ? s.winner.name + '<br>' + s.winner.score + ' pts' : '-') + '</div>';
+    setHTML(panel, 'final', '<div class="big fire">GANADOR</div><div class="big">' +
+      (s.winner ? s.winner.name + '<br>' + s.winner.score + ' pts' : '-') + '</div>');
     return;
   }
 
   if (s.phase === 'board') {
     $('statusLine').textContent = 'Ronda ' + s.round + ' terminada';
-    panel.innerHTML = '<div class="big neon">SIGUIENTE RONDA EN ' + s.left + '</div>';
+    setHTML(panel, 'board' + s.left, '<div class="big neon">SIGUIENTE RONDA EN ' + s.left + '</div>');
     return;
   }
 
@@ -174,42 +174,43 @@ socket.on('state', s => {
 
   if (y.isMystery) {
     // discreción en penumbra: sin colores fuertes, sin parpadeos
-    panel.innerHTML = '<div class="muted" style="font-size:15px;line-height:1.8;color:#9aa">' +
-      'Tú eres el Personaje Misterioso de esta ronda.<br>Disimula y guarda silencio.</div>';
+    setHTML(panel, 'mystery' + s.round, '<div class="muted" style="font-size:15px;line-height:1.8;color:#9aa">' +
+      'Tú eres el Personaje Misterioso de esta ronda.<br>Disimula y guarda silencio.</div>');
     return;
   }
 
   if (s.phase === 'reveal') {
-    panel.innerHTML = '<div class="big fire">PREPARATE</div><div class="huge neon">' + s.left + '</div>';
+    setHTML(panel, 'reveal' + s.left, '<div class="big fire">PREPARATE</div><div class="huge neon">' + s.left + '</div>');
     return;
   }
 
   if (y.correct) {
-    panel.innerHTML = '<div class="big pix flash">¡CORRECTO!</div><div class="muted">Guarda silencio</div>';
+    setHTML(panel, 'ok' + s.round, '<div class="big pix flash">¡CORRECTO!</div><div class="muted">Guarda silencio</div>');
     return;
   }
   if (y.attempts >= 2) {
-    panel.innerHTML = '<div class="big" style="color:var(--danger)">SIN INTENTOS</div>' +
-      '<div class="muted">Sin intentos restantes en esta ronda</div>';
+    setHTML(panel, 'out' + s.round, '<div class="big" style="color:var(--danger)">SIN INTENTOS</div>' +
+      '<div class="muted">Sin intentos restantes en esta ronda</div>');
     return;
   }
 
-  if (panel.dataset.round !== String(s.round) || !panel.querySelector('#pick')) {
-    panel.dataset.round = String(s.round);
-    panel.innerHTML = '<div class="big fire" style="font-size:12px">¿QUIEN ES?</div>' +
+  if (setHTML(panel, 'guess' + s.round, '<div class="big fire" style="font-size:12px">¿QUIEN ES?</div>' +
       '<select id="pick"><option value="">-- elige un nombre --</option>' +
       s.names.map(n => '<option value="' + n.pid + '">' + n.name + '</option>').join('') +
       '</select><div style="margin-top:14px"><button class="btn alt" id="go">ADIVINAR</button></div>' +
-      '<div class="muted" id="left"></div>';
+      '<div class="muted" id="left"></div>')) {
+    sentGuesses = 0;
     $('go').onclick = () => {
       const v = $('pick').value;
       if (!v) return;
+      sentGuesses++;                 // bloquea el botón hasta que el servidor confirme
+      $('go').disabled = true;
       socket.emit('player:guess', v);
-      guessedThisRound = s.round;
     };
   }
+  $('go').disabled = sentGuesses > y.attempts;
   $('left').textContent = 'Pista ' + s.clueNo + ' · Intentos restantes: ' + (2 - y.attempts);
-  if (y.attempts === 1 && guessedThisRound === s.round) $('left').style.color = 'var(--fire)';
+  $('left').style.color = y.attempts === 1 ? 'var(--fire)' : '';
 });
 </script>
 </body>

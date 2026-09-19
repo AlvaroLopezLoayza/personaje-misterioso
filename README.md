@@ -16,7 +16,7 @@ Juego arcade en vivo. Pantalla LED + celulares, en tiempo real con Socket.io.
 ```bash
 npm install
 npm start          # http://localhost:3000
-node test_game.js  # verifica rondas, pistas, intentos, puntaje y bonos
+npm test           # lógica de ronda + flujo completo por websocket
 ```
 
 ## Desplegar en Render

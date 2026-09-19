@@ -74,7 +74,7 @@ socket.on('connect', () => socket.emit('host:join'));
 const bar = document.getElementById('bar');
 const center = document.getElementById('center');
 const nodes = new Map();
-let lastPhase = '', lastRound = -1, lastBonus = '', fxTimer = null;
+let lastBonus = '', fxTimer = null;
 
 function slot(i, total, winner) {
   const cols = Math.max(1, Math.ceil(total / 2));
@@ -135,65 +135,53 @@ socket.on('state', s => {
   const clueno = document.getElementById('clueno');
   const clock = document.getElementById('clock');
   const total = document.getElementById('total');
-  const newRound = s.round !== lastRound;
-  lastRound = s.round;
 
   if (s.phase === 'lobby') {
     clueno.textContent = 'ESPERANDO JUGADORES';
     clock.textContent = s.players.length;
     total.textContent = 'CONECTADOS';
-    if (lastPhase !== 'lobby') {
-      center.innerHTML = '<h1 class="neon">EL PERSONAJE MISTERIOSO</h1>' +
+    if (setHTML(center, 'lobby', '<h1 class="neon">EL PERSONAJE MISTERIOSO</h1>' +
         '<div id="qr">cargando...</div><div class="url">' + location.origin + '</div>' +
-        '<div class="arcade fire" style="font-size:2vh">ESCANEA EL QR Y REGISTRATE</div>';
+        '<div class="arcade fire" style="font-size:2vh">ESCANEA EL QR Y REGISTRATE</div>')) {
       fetch('/qr').then(r => r.text()).then(svg => { const q = document.getElementById('qr'); if (q) q.innerHTML = svg; });
     }
   } else if (s.phase === 'reveal') {
     clueno.textContent = 'RONDA ' + s.round + ' / ' + s.rounds;
     clock.textContent = s.left;
     total.textContent = 'PREPARENSE';
-    center.innerHTML = '<h1 class="fire">RONDA ' + s.round + '</h1>' +
-      '<div class="arcade neon" style="font-size:3vh">ALGUIEN YA SABE QUE ES EL PERSONAJE MISTERIOSO...</div>';
+    setHTML(center, 'reveal' + s.round, '<h1 class="fire">RONDA ' + s.round + '</h1>' +
+      '<div class="arcade neon" style="font-size:3vh">ALGUIEN YA SABE QUE ES EL PERSONAJE MISTERIOSO...</div>');
   } else if (s.phase === 'round') {
     clueno.textContent = 'PISTA NUMERO ' + s.clue.no;
     clock.textContent = s.clue.clueLeft;
     clock.classList.toggle('hot', s.clue.clueLeft <= 3);
     total.textContent = 'RONDA ' + s.left + 's';
-    const key = 'c' + s.round + '-' + s.clue.no;
-    if (center.dataset.key !== key) {
-      center.dataset.key = key;
-      center.innerHTML = '<div id="enun">' + s.clue.label + '</div>' +
-        (s.clue.photo
-          ? '<img id="photo" src="' + s.clue.photo + '" alt="pista">'
-          : '<div id="answer">' + (s.clue.text || '-') + '</div>');
-    }
+    setHTML(center, 'c' + s.round + '-' + s.clue.no, '<div id="enun">' + s.clue.label + '</div>' +
+      (s.clue.photo
+        ? '<img id="photo" src="' + s.clue.photo + '" alt="pista">'
+        : '<div id="answer">' + (s.clue.text || '-') + '</div>'));
   } else if (s.phase === 'board') {
     clueno.textContent = 'FIN DE LA RONDA ' + s.round;
     clock.textContent = s.left;
     clock.classList.remove('hot');
     total.textContent = 'SIGUIENTE RONDA';
-    if (lastPhase !== 'board' || newRound) {
-      center.dataset.key = '';
-      center.innerHTML = (s.bonusMsg ? '<div id="bonus">' + s.bonusMsg + '</div>' : '') + boardHTML(s.board);
-    }
+    setHTML(center, 'board' + s.round,
+      (s.bonusMsg ? '<div id="bonus">' + s.bonusMsg + '</div>' : '') + boardHTML(s.board));
   } else if (s.phase === 'final') {
     clueno.textContent = 'FIN DEL JUEGO';
     clock.textContent = '*';
     total.textContent = '';
-    if (lastPhase !== 'final') {
-      center.dataset.key = '';
-      const w = s.winner || { name: '-', avatar: 'rojo', score: 0 };
-      center.innerHTML = '<h1 class="fire">GRAN GANADOR</h1>' +
+    const w = s.winner || { name: '-', avatar: 'rojo', score: 0 };
+    if (setHTML(center, 'final' + w.name, '<h1 class="fire">GRAN GANADOR</h1>' +
         '<div style="width:18vh;height:20vh;margin:auto">' + avatarSVG(w.avatar, 'monito bounce') + '</div>' +
         '<div class="arcade pix" style="font-size:4vh">' + w.name + '</div>' +
-        '<div class="arcade neon" style="font-size:3vh">' + w.score + ' PUNTOS</div>' + boardHTML(s.board);
+        '<div class="arcade neon" style="font-size:3vh">' + w.score + ' PUNTOS</div>' + boardHTML(s.board))) {
       confetti();
       fxTimer = setInterval(confetti, 3000);
     }
   }
   if (s.phase !== 'final' && fxTimer) { clearInterval(fxTimer); fxTimer = null; }
   if (s.bonusMsg && s.bonusMsg !== lastBonus) { confetti(); lastBonus = s.bonusMsg; }
-  lastPhase = s.phase;
 });
 </script>
 </body>

@@ -46,9 +46,10 @@ const alive = () => [...players.values()];
 const pool = () => alive().filter(p => !p.wasMystery);
 
 function startRound() {
-  const picked = G.nextMysteryId && players.has(G.nextMysteryId) && !players.get(G.nextMysteryId).wasMystery
-    ? [players.get(G.nextMysteryId)]
-    : pool();
+  const manual = G.nextMysteryId && players.has(G.nextMysteryId) && !players.get(G.nextMysteryId).wasMystery;
+  // Preferimos a quien tenga el celular conectado: si no, nunca vería su rol.
+  const picked = manual ? [players.get(G.nextMysteryId)]
+    : (pool().filter(p => p.online).length ? pool().filter(p => p.online) : pool());
   if (!picked.length || G.round >= G.rounds) return endGame();
 
   const m = picked[Math.floor(Math.random() * picked.length)];

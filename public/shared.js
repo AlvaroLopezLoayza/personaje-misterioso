@@ -36,6 +36,15 @@ function avatarSVG(id, cls) {
   return '<svg class="' + (cls || 'monito') + '" viewBox="0 0 8 9" shape-rendering="crispEdges">' + rects + '</svg>';
 }
 
+// Reescribe un bloque sólo si su contenido cambió. El estado llega 2 veces por
+// segundo: sin esta guarda las animaciones CSS se reinician en cada tick.
+function setHTML(el, key, html) {
+  if (el.dataset.k === key) return false;
+  el.dataset.k = key;
+  el.innerHTML = html;
+  return true;
+}
+
 // Comprime la foto en el navegador antes de enviarla (máx 800px, JPEG 0.6).
 function compressImage(file, maxW, quality) {
   maxW = maxW || 800; quality = quality || 0.6;
