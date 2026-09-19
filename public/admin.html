@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Control · Personaje Misterioso</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { padding: 16px; max-width: 760px; margin: auto; }
+  h1 { font-size: 14px; color: var(--fire); text-align: center; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #222; font-size: 15px; }
+  .row .mini { width: 26px; height: 30px; flex: 0 0 26px; }
+  .tag { font-size: 12px; color: var(--pixel); }
+  .stack > * + * { margin-top: 14px; }
+  .hide { display: none; }
+  .kick { background: none; border: 2px solid var(--danger); color: var(--danger); font-family: inherit; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>PANEL DE CONTROL</h1>
+
+<section id="gate" class="card">
+  <label>PIN DE ADMINISTRADOR</label>
+  <input id="pin" type="password" inputmode="numeric" placeholder="PIN">
+  <div style="margin-top:12px"><button class="btn" id="enter">ENTRAR</button></div>
+  <div class="tag" id="gerr" style="color:var(--danger)"></div>
+</section>
+
+<section id="panel" class="hide stack">
+  <div class="card">
+    <div id="info" style="font-family:'Press Start 2P',monospace;font-size:13px;line-height:2"></div>
+    <label>NUMERO DE RONDAS</label>
+    <input id="rounds" type="number" min="1" max="20" value="5">
+    <label>PERSONAJE MISTERIOSO DE LA PROXIMA RONDA</label>
+    <select id="pick"><option value="">Automático (aleatorio, sin repetir)</option></select>
+    <div class="grid">
+      <button class="btn" id="start">INICIAR</button>
+      <button class="btn alt" id="next">SIGUIENTE FASE</button>
+      <button class="btn warn" id="pause">PAUSA</button>
+      <button class="btn bad" id="reset">REINICIAR</button>
+    </div>
+    <div style="margin-top:12px"><a class="tag" href="host.html" target="_blank">Abrir pantalla LED →</a></div>
+  </div>
+
+  <div class="card">
+    <div class="tag">JUGADORES (<span id="count">0</span>)</div>
+    <div id="list"></div>
+  </div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="shared.js"></script>
+<script>
+const socket = io();
+const $ = id => document.getElementById(id);
+
+$('enter').onclick = () => socket.emit('admin:join', $('pin').value.trim());
+$('pin').onkeydown = e => { if (e.key === 'Enter') $('enter').click(); };
+socket.on('admin:denied', () => $('gerr').textContent = 'PIN incorrecto');
+
+$('start').onclick = () => socket.emit('admin:start');
+$('next').onclick = () => socket.emit('admin:next');
+$('pause').onclick = () => socket.emit('admin:pause');
+$('reset').onclick = () => { if (confirm('¿Reiniciar el juego y todos los puntajes?')) socket.emit('admin:reset'); };
+$('rounds').onchange = e => socket.emit('admin:rounds', e.target.value);
+$('pick').onchange = e => socket.emit('admin:pick', e.target.value);
+
+socket.on('admin', s => {
+  $('gate').classList.add('hide');
+  $('panel').classList.remove('hide');
+
+  const mystery = s.players.find(p => p.pid === s.mysteryId);
+  $('info').innerHTML =
+    'FASE: <span class="neon">' + s.phase.toUpperCase() + (s.paused ? ' (PAUSA)' : '') + '</span><br>' +
+    'RONDA: <span class="fire">' + s.round + ' / ' + s.rounds + '</span><br>' +
+    'TIEMPO: <span class="pix">' + s.left + 's</span><br>' +
+    'MISTERIOSO: <span class="fire">' + (mystery ? mystery.name : '-') + '</span>';
+  $('pause').textContent = s.paused ? 'REANUDAR' : 'PAUSA';
+  if (document.activeElement !== $('rounds')) $('rounds').value = s.rounds;
+
+  const opts = '<option value="">Automático (aleatorio, sin repetir)</option>' +
+    s.players.map(p => '<option value="' + p.pid + '">' + p.name + '</option>').join('');
+  if ($('pick').dataset.sig !== opts) { $('pick').dataset.sig = opts; $('pick').innerHTML = opts; }
+
+  $('count').textContent = s.players.length;
+  $('list').innerHTML = s.board.map(p =>
+    '<div class="row"><span class="mini">' + avatarSVG(p.avatar) + '</span>' +
+    '<span style="flex:1">' + p.name + '</span><b class="pix">' + p.score + '</b>' +
+    '<button class="kick" data-pid="' + p.pid + '">X</button></div>').join('');
+});
+
+$('list').onclick = e => {
+  const b = e.target.closest('.kick');
+  if (b && confirm('¿Eliminar a este jugador?')) socket.emit('admin:kick', b.dataset.pid);
+};
+</script>
+</body>
+</html>

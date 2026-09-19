@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>EL PERSONAJE MISTERIOSO</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+
+  /* ---------- Zona 1: barra de avatares en vivo ---------- */
+  #bar { height: 26vh; position: relative; border-bottom: 6px solid var(--neon); background: linear-gradient(#0a0820, #050505); }
+  .zone-tag { position: absolute; top: 6px; font-size: 12px; font-family: 'Press Start 2P', monospace; opacity: .8; }
+  .zone-tag.left { left: 14px; color: var(--fire); }
+  .zone-tag.right { right: 14px; color: var(--pixel); }
+  #bar .divider { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; background: repeating-linear-gradient(#00F0FF 0 10px, transparent 10px 20px); opacity: .5; }
+  .p {
+    position: absolute; width: 6.5vh; height: 7.3vh; text-align: center;
+    transition: left 1.3s cubic-bezier(.5,-0.3,.4,1.4), top .6s ease;
+  }
+  .p .nm { font-size: 11px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .p.win .nm { color: var(--pixel); }
+  .p.off { opacity: .35; }
+
+  /* ---------- Zona 2: pista central ---------- */
+  #center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; padding: 2vh; text-align: center; }
+  #enun { font-family: 'Press Start 2P', monospace; font-size: 2.2vh; color: var(--fire); }
+  #answer { font-family: 'Press Start 2P', monospace; font-size: 5.5vh; color: #fff; text-shadow: 0 0 18px var(--neon); line-height: 1.4; max-width: 90vw; }
+  #photo { max-height: 34vh; max-width: 46vw; border: 8px solid var(--fire); box-shadow: 0 0 0 8px #000, 0 0 40px rgba(255,215,0,.5); }
+  #bonus { font-family: 'Press Start 2P', monospace; font-size: 3vh; color: var(--pixel); animation: blink .5s steps(2) infinite; }
+  @keyframes blink { 50% { opacity: .15; } }
+
+  /* tabla de posiciones + final */
+  table { border-collapse: collapse; font-size: 2.4vh; }
+  td { padding: .5vh 1.4vh; border-bottom: 2px solid #222; }
+  td .mini { width: 4vh; height: 4.5vh; display: inline-block; }
+
+  /* ---------- Zona 3: pista + cronómetro ---------- */
+  #foot { height: 22vh; border-top: 6px solid var(--neon); display: flex; align-items: center; justify-content: space-around; background: #07061a; }
+  #clueno { font-family: 'Press Start 2P', monospace; font-size: 4.5vh; color: var(--neon); text-shadow: 0 0 16px var(--neon); }
+  #clock { font-family: 'Press Start 2P', monospace; font-size: 11vh; color: var(--fire); text-shadow: 0 0 24px #ff6b00; min-width: 2.2ch; text-align: center; }
+  #clock.hot { color: var(--danger); animation: blink .35s steps(2) infinite; }
+  #total { font-size: 2.4vh; color: #8ab; }
+  #qr { background: #fff; padding: 10px; width: 22vh; }
+  #qr svg { width: 100%; height: auto; display: block; }
+  .url { font-size: 2vh; color: var(--pixel); word-break: break-all; }
+  .fx { position: fixed; width: 10px; height: 10px; z-index: 5; animation: fall 3s linear forwards; }
+  @keyframes fall { to { transform: translateY(105vh) rotate(360deg); opacity: 0; } }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div class="divider"></div>
+  <div class="zone-tag left">ZONA DE ESPERA</div>
+  <div class="zone-tag right">VICTORIOSOS</div>
+</div>
+
+<div id="center"></div>
+
+<div id="foot">
+  <div id="clueno">EL PERSONAJE MISTERIOSO</div>
+  <div>
+    <div id="clock">--</div>
+    <div id="total"></div>
+  </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="shared.js"></script>
+<script>
+const socket = io();
+socket.on('connect', () => socket.emit('host:join'));
+
+const bar = document.getElementById('bar');
+const center = document.getElementById('center');
+const nodes = new Map();
+let lastPhase = '', lastRound = -1, lastBonus = '', fxTimer = null;
+
+function slot(i, total, winner) {
+  const cols = Math.max(1, Math.ceil(total / 2));
+  const col = i % cols, row = Math.floor(i / cols);
+  const halfW = 46, base = winner ? 52 : 2;
+  return { left: base + (col + .5) * (halfW / cols) - 3.2 + '%', top: (row ? 13 : 3) + 'vh' };
+}
+
+function renderBar(list) {
+  const waiting = list.filter(p => !p.solved);
+  const winners = list.filter(p => p.solved);
+  const seen = new Set();
+  [[waiting, false], [winners, true]].forEach(([grp, win]) => {
+    grp.forEach((p, i) => {
+      seen.add(p.pid);
+      let el = nodes.get(p.pid);
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'p';
+        el.innerHTML = '<div style="height:5.6vh">' + avatarSVG(p.avatar, 'monito bounce') + '</div><div class="nm"></div>';
+        el.style.left = '2%';
+        bar.appendChild(el);
+        nodes.set(p.pid, el);
+      }
+      el.querySelector('.nm').textContent = p.name.split(' ')[0];
+      el.classList.toggle('win', win);
+      el.classList.toggle('off', !p.online);
+      const s = slot(i, grp.length, win);
+      el.style.left = s.left;
+      el.style.top = s.top;
+    });
+  });
+  nodes.forEach((el, pid) => { if (!seen.has(pid)) { el.remove(); nodes.delete(pid); } });
+}
+
+function boardHTML(board) {
+  return '<h2 class="fire">TABLA DE POSICIONES</h2><table>' + board.slice(0, 12).map((p, i) =>
+    '<tr><td class="neon">' + (i + 1) + '</td><td><span class="mini">' + avatarSVG(p.avatar) +
+    '</span></td><td>' + p.name + '</td><td class="pix">' + p.score + '</td></tr>').join('') + '</table>';
+}
+
+function confetti() {
+  for (let i = 0; i < 70; i++) {
+    const d = document.createElement('div');
+    d.className = 'fx';
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.top = '-2vh';
+    d.style.background = ['#00F0FF', '#FFD700', '#00FF66', '#FF4136', '#B14BFF'][i % 5];
+    d.style.animationDelay = (Math.random() * 1.5) + 's';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 5000);
+  }
+}
+
+socket.on('state', s => {
+  renderBar(s.players);
+
+  const clueno = document.getElementById('clueno');
+  const clock = document.getElementById('clock');
+  const total = document.getElementById('total');
+  const newRound = s.round !== lastRound;
+  lastRound = s.round;
+
+  if (s.phase === 'lobby') {
+    clueno.textContent = 'ESPERANDO JUGADORES';
+    clock.textContent = s.players.length;
+    total.textContent = 'CONECTADOS';
+    if (lastPhase !== 'lobby') {
+      center.innerHTML = '<h1 class="neon">EL PERSONAJE MISTERIOSO</h1>' +
+        '<div id="qr">cargando...</div><div class="url">' + location.origin + '</div>' +
+        '<div class="arcade fire" style="font-size:2vh">ESCANEA EL QR Y REGISTRATE</div>';
+      fetch('/qr').then(r => r.text()).then(svg => { const q = document.getElementById('qr'); if (q) q.innerHTML = svg; });
+    }
+  } else if (s.phase === 'reveal') {
+    clueno.textContent = 'RONDA ' + s.round + ' / ' + s.rounds;
+    clock.textContent = s.left;
+    total.textContent = 'PREPARENSE';
+    center.innerHTML = '<h1 class="fire">RONDA ' + s.round + '</h1>' +
+      '<div class="arcade neon" style="font-size:3vh">ALGUIEN YA SABE QUE ES EL PERSONAJE MISTERIOSO...</div>';
+  } else if (s.phase === 'round') {
+    clueno.textContent = 'PISTA NUMERO ' + s.clue.no;
+    clock.textContent = s.clue.clueLeft;
+    clock.classList.toggle('hot', s.clue.clueLeft <= 3);
+    total.textContent = 'RONDA ' + s.left + 's';
+    const key = 'c' + s.round + '-' + s.clue.no;
+    if (center.dataset.key !== key) {
+      center.dataset.key = key;
+      center.innerHTML = '<div id="enun">' + s.clue.label + '</div>' +
+        (s.clue.photo
+          ? '<img id="photo" src="' + s.clue.photo + '" alt="pista">'
+          : '<div id="answer">' + (s.clue.text || '-') + '</div>');
+    }
+  } else if (s.phase === 'board') {
+    clueno.textContent = 'FIN DE LA RONDA ' + s.round;
+    clock.textContent = s.left;
+    clock.classList.remove('hot');
+    total.textContent = 'SIGUIENTE RONDA';
+    if (lastPhase !== 'board' || newRound) {
+      center.dataset.key = '';
+      center.innerHTML = (s.bonusMsg ? '<div id="bonus">' + s.bonusMsg + '</div>' : '') + boardHTML(s.board);
+    }
+  } else if (s.phase === 'final') {
+    clueno.textContent = 'FIN DEL JUEGO';
+    clock.textContent = '*';
+    total.textContent = '';
+    if (lastPhase !== 'final') {
+      center.dataset.key = '';
+      const w = s.winner || { name: '-', avatar: 'rojo', score: 0 };
+      center.innerHTML = '<h1 class="fire">GRAN GANADOR</h1>' +
+        '<div style="width:18vh;height:20vh;margin:auto">' + avatarSVG(w.avatar, 'monito bounce') + '</div>' +
+        '<div class="arcade pix" style="font-size:4vh">' + w.name + '</div>' +
+        '<div class="arcade neon" style="font-size:3vh">' + w.score + ' PUNTOS</div>' + boardHTML(s.board);
+      confetti();
+      fxTimer = setInterval(confetti, 3000);
+    }
+  }
+  if (s.phase !== 'final' && fxTimer) { clearInterval(fxTimer); fxTimer = null; }
+  if (s.bonusMsg && s.bonusMsg !== lastBonus) { confetti(); lastBonus = s.bonusMsg; }
+  lastPhase = s.phase;
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<title>El Personaje Misterioso</title>
+<link rel="stylesheet" href="style.css">
+<style>
+  body { padding: 16px 14px 40px; max-width: 560px; margin: auto; }
+  h1 { font-size: 15px; color: var(--neon); text-align: center; line-height: 1.6; margin: 10px 0 20px; }
+  .avatars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .av { border: 3px solid #333; background: #11102a; padding: 6px; cursor: pointer; }
+  .av.sel { border-color: var(--pixel); box-shadow: 0 0 14px var(--pixel); }
+  .av svg { width: 100%; height: auto; }
+  #prev { width: 100%; max-height: 180px; object-fit: contain; margin-top: 10px; border: 3px solid var(--fire); display: none; }
+  .big { font-family: 'Press Start 2P', monospace; font-size: 15px; line-height: 1.8; text-align: center; }
+  .huge { font-family: 'Press Start 2P', monospace; font-size: 42px; text-align: center; margin: 12px 0; }
+  .muted { color: #8ab; font-size: 14px; text-align: center; }
+  .stack > * + * { margin-top: 14px; }
+  .hide { display: none; }
+  .me { width: 64px; height: 72px; margin: 0 auto 8px; }
+  .row { display: flex; align-items: center; gap: 8px; font-size: 15px; padding: 5px 0; border-bottom: 1px solid #222; }
+  .row .mini { width: 26px; height: 30px; flex: 0 0 26px; }
+  .flash { animation: pulse .6s steps(2) 3; }
+  @keyframes pulse { 50% { opacity: .2; } }
+</style>
+</head>
+<body>
+
+<!-- ------------------------------ registro ------------------------------ -->
+<section id="reg">
+  <h1>EL PERSONAJE<br>MISTERIOSO</h1>
+  <div class="card">
+    <label>TU NOMBRE COMPLETO</label>
+    <input id="name" maxlength="30" autocomplete="name" placeholder="Nombre y apellido">
+
+    <label>ELIGE TU MONITO</label>
+    <div class="avatars" id="avs"></div>
+
+    <label>1. ¿CUANTO TIEMPO LLEVAS EN LA IGLESIA? (O ERES INVITADO)</label>
+    <input id="a1" maxlength="80" placeholder="Ej: 3 años / Invitado">
+
+    <label>2. ¿QUIEN ES TU AMIGO MAS CERCANO EN LA REUNION?</label>
+    <input id="a2" maxlength="80" placeholder="Ej: Carlos">
+
+    <label>3. UN DETALLE O PRENDA LLAMATIVA QUE LLEVAS HOY</label>
+    <input id="a3" maxlength="80" placeholder="Ej: polo negro y zapatillas azules">
+
+    <label>4. TU PASATIEMPO O ACTIVIDAD FAVORITA</label>
+    <input id="a4" maxlength="80" placeholder="Ej: tocar guitarra">
+
+    <label>5. UN LUGAR DEL MUNDO AL QUE TE GUSTARIA VIAJAR</label>
+    <input id="a5" maxlength="80" placeholder="Ej: Japón">
+
+    <label>FOTO MISTERIOSA (OBJETO, PAISAJE O MASCOTA — SIN ROSTROS)</label>
+    <input id="photo" type="file" accept="image/*">
+    <img id="prev" alt="vista previa">
+
+    <div class="muted" id="err" style="color:var(--danger);margin-top:10px"></div>
+    <div style="margin-top:18px"><button class="btn" id="send">ENTRAR AL JUEGO</button></div>
+  </div>
+</section>
+
+<!-- ------------------------------ juego ------------------------------ -->
+<section id="game" class="hide stack">
+  <div class="card" style="text-align:center">
+    <div class="me" id="meAv"></div>
+    <div class="big" id="meName"></div>
+    <div class="huge pix" id="meScore">0</div>
+    <div class="muted" id="statusLine">Esperando a que inicie el juego...</div>
+  </div>
+
+  <div class="card" id="panel"></div>
+
+  <div class="card">
+    <div class="big fire" style="font-size:12px">TABLA DE POSICIONES</div>
+    <div id="board"></div>
+  </div>
+</section>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="shared.js"></script>
+<script>
+const socket = io();
+const $ = id => document.getElementById(id);
+let avatar = AVATARS[0].id, photoData = null, pid = localStorage.getItem('pm_pid');
+
+$('avs').innerHTML = AVATARS.map(a =>
+  '<div class="av' + (a.id === avatar ? ' sel' : '') + '" data-id="' + a.id + '">' + avatarSVG(a.id) + '</div>').join('');
+$('avs').onclick = e => {
+  const el = e.target.closest('.av');
+  if (!el) return;
+  avatar = el.dataset.id;
+  [...$('avs').children].forEach(c => c.classList.toggle('sel', c === el));
+};
+
+$('photo').onchange = async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  try {
+    photoData = await compressImage(f, 800, 0.6);
+    $('prev').src = photoData;
+    $('prev').style.display = 'block';
+  } catch (err) { $('err').textContent = 'No se pudo procesar la foto'; }
+};
+
+$('send').onclick = () => {
+  const name = $('name').value.trim();
+  if (!name) return $('err').textContent = 'Escribe tu nombre completo';
+  if (!photoData) return $('err').textContent = 'Sube tu foto misteriosa';
+  $('send').disabled = true;
+  socket.emit('player:join', {
+    pid, name, avatar, photo: photoData,
+    a1: $('a1').value.trim() || '-', a2: $('a2').value.trim() || '-',
+    a3: $('a3').value.trim() || '-', a4: $('a4').value.trim() || '-',
+    a5: $('a5').value.trim() || '-'
+  }, res => {
+    $('send').disabled = false;
+    if (res.error) return $('err').textContent = res.error;
+    pid = res.pid;
+    localStorage.setItem('pm_pid', pid);
+    $('reg').classList.add('hide');
+    $('game').classList.remove('hide');
+  });
+};
+
+// reconexión tras bloquear la pantalla
+socket.on('connect', () => {
+  if (!pid) return;
+  socket.emit('player:resume', pid, res => {
+    if (res && res.pid) { $('reg').classList.add('hide'); $('game').classList.remove('hide'); }
+    else localStorage.removeItem('pm_pid');
+  });
+});
+
+let guessedThisRound = -1;
+socket.on('state', s => {
+  const y = s.you;
+  $('meAv').innerHTML = avatarSVG(y.avatar, 'monito bounce');
+  $('meName').textContent = y.name;
+  $('meScore').textContent = y.score;
+  $('board').innerHTML = s.board.map((p, i) =>
+    '<div class="row"><b class="neon">' + (i + 1) + '</b><span class="mini">' + avatarSVG(p.avatar) +
+    '</span><span style="flex:1">' + p.name + '</span><b class="pix">' + p.score + '</b></div>').join('');
+
+  const panel = $('panel');
+
+  if (s.phase === 'lobby') {
+    $('statusLine').textContent = 'Registrado. Espera a que el anfitrión inicie.';
+    panel.innerHTML = '<div class="big neon">LISTO</div><div class="muted">Mira la pantalla grande</div>';
+    return;
+  }
+
+  if (s.phase === 'final') {
+    $('statusLine').textContent = 'Juego terminado';
+    panel.innerHTML = '<div class="big fire">GANADOR</div><div class="big">' +
+      (s.winner ? s.winner.name + '<br>' + s.winner.score + ' pts' : '-') + '</div>';
+    return;
+  }
+
+  if (s.phase === 'board') {
+    $('statusLine').textContent = 'Ronda ' + s.round + ' terminada';
+    panel.innerHTML = '<div class="big neon">SIGUIENTE RONDA EN ' + s.left + '</div>';
+    return;
+  }
+
+  // reveal + round
+  $('statusLine').textContent = 'Ronda ' + s.round + ' de ' + s.rounds;
+
+  if (y.isMystery) {
+    // discreción en penumbra: sin colores fuertes, sin parpadeos
+    panel.innerHTML = '<div class="muted" style="font-size:15px;line-height:1.8;color:#9aa">' +
+      'Tú eres el Personaje Misterioso de esta ronda.<br>Disimula y guarda silencio.</div>';
+    return;
+  }
+
+  if (s.phase === 'reveal') {
+    panel.innerHTML = '<div class="big fire">PREPARATE</div><div class="huge neon">' + s.left + '</div>';
+    return;
+  }
+
+  if (y.correct) {
+    panel.innerHTML = '<div class="big pix flash">¡CORRECTO!</div><div class="muted">Guarda silencio</div>';
+    return;
+  }
+  if (y.attempts >= 2) {
+    panel.innerHTML = '<div class="big" style="color:var(--danger)">SIN INTENTOS</div>' +
+      '<div class="muted">Sin intentos restantes en esta ronda</div>';
+    return;
+  }
+
+  if (panel.dataset.round !== String(s.round) || !panel.querySelector('#pick')) {
+    panel.dataset.round = String(s.round);
+    panel.innerHTML = '<div class="big fire" style="font-size:12px">¿QUIEN ES?</div>' +
+      '<select id="pick"><option value="">-- elige un nombre --</option>' +
+      s.names.map(n => '<option value="' + n.pid + '">' + n.name + '</option>').join('') +
+      '</select><div style="margin-top:14px"><button class="btn alt" id="go">ADIVINAR</button></div>' +
+      '<div class="muted" id="left"></div>';
+    $('go').onclick = () => {
+      const v = $('pick').value;
+      if (!v) return;
+      socket.emit('player:guess', v);
+      guessedThisRound = s.round;
+    };
+  }
+  $('left').textContent = 'Pista ' + s.clueNo + ' · Intentos restantes: ' + (2 - y.attempts);
+  if (y.attempts === 1 && guessedThisRound === s.round) $('left').style.color = 'var(--fire)';
+});
+</script>
+</body>
+</html>

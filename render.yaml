@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: personaje-misterioso
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: ADMIN_PIN
+        value: "2580"
+      - key: PUBLIC_URL
+        sync: false
