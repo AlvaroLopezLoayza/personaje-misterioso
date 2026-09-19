@@ -30,7 +30,7 @@ body::before {
   z-index: 999;
 }
 
-h1, h2, .arcade { font-family: 'Press Start 2P', monospace; letter-spacing: 1px; }
+h1, h2, .arcade { font-family: 'Press Start 2P', 'Silkscreen', monospace; letter-spacing: 1px; }
 
 .monito { width: 100%; height: 100%; display: block; }
 
@@ -42,7 +42,7 @@ h1, h2, .arcade { font-family: 'Press Start 2P', monospace; letter-spacing: 1px;
 .pix  { color: var(--pixel); text-shadow: 0 0 4px rgba(0, 255, 102, .45); }
 
 .btn {
-  font-family: 'Press Start 2P', monospace;
+  font-family: 'Press Start 2P', 'Silkscreen', monospace;
   background: var(--pixel);
   color: #06210f;
   border: 4px solid #fff;
@@ -78,3 +78,7 @@ label { display: block; margin: 18px 0 6px; color: var(--fire); font-size: 13px;
   box-shadow: 0 0 0 4px #000, 0 0 24px rgba(0, 240, 255, .35);
   padding: 16px;
 }
+
+/* Texto con contenido en español (nombres y respuestas de los jugadores).
+   Press Start 2P no trae Ñ ni vocales acentuadas: ahí usamos Silkscreen. */
+.es { font-family: 'Silkscreen', monospace; font-weight: 700; letter-spacing: 1px; }

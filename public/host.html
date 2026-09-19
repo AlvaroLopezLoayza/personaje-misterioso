@@ -9,7 +9,7 @@
 
   /* ---------- Zona 1: barra de avatares en vivo ---------- */
   #bar { height: 26vh; position: relative; border-bottom: 6px solid var(--neon); background: linear-gradient(#0a0820, #050505); }
-  .zone-tag { position: absolute; top: 6px; font-size: 12px; font-family: 'Press Start 2P', monospace; opacity: .8; }
+  .zone-tag { position: absolute; top: 6px; font-size: 12px; font-family: 'Press Start 2P', 'Silkscreen', monospace; opacity: .8; }
   .zone-tag.left { left: 14px; color: var(--fire); }
   .zone-tag.right { right: 14px; color: var(--pixel); }
   #bar .divider { position: absolute; left: 50%; top: 0; bottom: 0; width: 4px; background: repeating-linear-gradient(#00F0FF 0 10px, transparent 10px 20px); opacity: .5; }
@@ -22,22 +22,26 @@
   .p.off { opacity: .35; }
 
   /* ---------- Zona 2: pista central ---------- */
-  #center { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2vh; padding: 2vh; text-align: center; }
-  #enun { font-family: 'Press Start 2P', monospace; font-size: 2.2vh; color: var(--fire); }
-  #answer { font-family: 'Press Start 2P', monospace; font-size: 5.5vh; color: #fff; text-shadow: 0 0 6px rgba(0, 240, 255, .5); line-height: 1.4; max-width: 90vw; }
+  /* min-height:0 + overflow:hidden: sin esto un contenido más alto que la zona
+     se derrama hacia ARRIBA y tapa la barra de avatares. */
+  #center { flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1.2vh; padding: 1.2vh; text-align: center; }
+  #enun { font-family: 'Silkscreen', monospace; font-weight: 700; font-size: 2.2vh; color: var(--fire); }
+  #answer { font-family: 'Silkscreen', monospace; font-weight: 700; font-size: 5.5vh; color: #fff; text-shadow: 0 0 6px rgba(0, 240, 255, .5); line-height: 1.4; max-width: 90vw; }
   #photo { max-height: 34vh; max-width: 46vw; border: 8px solid var(--fire); box-shadow: 0 0 0 8px #000, 0 0 40px rgba(255,215,0,.5); }
-  #bonus { font-family: 'Press Start 2P', monospace; font-size: 3vh; color: var(--pixel); animation: blink .5s steps(2) infinite; }
+  #bonus { font-family: 'Press Start 2P', 'Silkscreen', monospace; font-size: 2.2vh; color: var(--pixel); animation: blink .5s steps(2) infinite; }
   @keyframes blink { 50% { opacity: .15; } }
 
   /* tabla de posiciones + final */
-  table { border-collapse: collapse; font-size: 2.4vh; }
-  td { padding: .5vh 1.4vh; border-bottom: 2px solid #222; }
-  td .mini { width: 4vh; height: 4.5vh; display: inline-block; }
+  table { border-collapse: collapse; font-size: 2vh; }
+  .resto { font-size: 1.8vh; color: #8ab; margin-top: .5vh; }
+  td { padding: .35vh 1.2vh; border-bottom: 2px solid #222; }
+  td .mini { width: 2.8vh; height: 3.2vh; display: inline-block; }
+  #center h1, #center h2 { margin: 0; }  /* los márgenes por defecto desbordan la zona */
 
   /* ---------- Zona 3: pista + cronómetro ---------- */
   #foot { height: 22vh; border-top: 6px solid var(--neon); display: flex; align-items: center; justify-content: space-around; background: #07061a; }
-  #clueno { font-family: 'Press Start 2P', monospace; font-size: 4.5vh; color: var(--neon); text-shadow: 0 0 6px rgba(0, 240, 255, .5); }
-  #clock { font-family: 'Press Start 2P', monospace; font-size: 11vh; color: var(--fire); text-shadow: 0 0 8px rgba(255, 107, 0, .5); min-width: 2.2ch; text-align: center; }
+  #clueno { font-family: 'Press Start 2P', 'Silkscreen', monospace; font-size: 4.5vh; color: var(--neon); text-shadow: 0 0 6px rgba(0, 240, 255, .5); }
+  #clock { font-family: 'Press Start 2P', 'Silkscreen', monospace; font-size: 11vh; color: var(--fire); text-shadow: 0 0 8px rgba(255, 107, 0, .5); min-width: 2.2ch; text-align: center; }
   #clock.hot { color: var(--danger); animation: blink .35s steps(2) infinite; }
   #total { font-size: 2.4vh; color: #8ab; }
   #qr { background: #fff; padding: 10px; width: 22vh; }
@@ -110,10 +114,14 @@ function renderBar(list) {
   nodes.forEach((el, pid) => { if (!seen.has(pid)) { el.remove(); nodes.delete(pid); } });
 }
 
-function boardHTML(board) {
-  return '<h2 class="fire">TABLA DE POSICIONES</h2><table>' + board.slice(0, 12).map((p, i) =>
+// `top` acota las filas para que la tabla quepa siempre en la zona central:
+// con 30 jugadores la lista completa no entra en 48vh de alto.
+function boardHTML(board, top) {
+  const resto = board.length - top;
+  return '<h2 class="fire">TABLA DE POSICIONES</h2><table>' + board.slice(0, top).map((p, i) =>
     '<tr><td class="neon">' + (i + 1) + '</td><td><span class="mini">' + avatarSVG(p.avatar) +
-    '</span></td><td>' + p.name + '</td><td class="pix">' + p.score + '</td></tr>').join('') + '</table>';
+    '</span></td><td class="es">' + p.name + '</td><td class="pix">' + p.score + '</td></tr>').join('') +
+    '</table>' + (resto > 0 ? '<div class="resto">y ' + resto + ' jugadores más</div>' : '');
 }
 
 function confetti() {
@@ -166,16 +174,16 @@ socket.on('state', s => {
     clock.classList.remove('hot');
     total.textContent = 'SIGUIENTE RONDA';
     setHTML(center, 'board' + s.round,
-      (s.bonusMsg ? '<div id="bonus">' + s.bonusMsg + '</div>' : '') + boardHTML(s.board));
+      (s.bonusMsg ? '<div id="bonus">' + s.bonusMsg + '</div>' : '') + boardHTML(s.board, 8));
   } else if (s.phase === 'final') {
     clueno.textContent = 'FIN DEL JUEGO';
     clock.textContent = '*';
     total.textContent = '';
     const w = s.winner || { name: '-', avatar: 'rojo', score: 0 };
-    if (setHTML(center, 'final' + w.name, '<h1 class="fire">GRAN GANADOR</h1>' +
-        '<div style="width:18vh;height:20vh;margin:auto">' + avatarSVG(w.avatar, 'monito bounce') + '</div>' +
-        '<div class="arcade pix" style="font-size:4vh">' + w.name + '</div>' +
-        '<div class="arcade neon" style="font-size:3vh">' + w.score + ' PUNTOS</div>' + boardHTML(s.board))) {
+    if (setHTML(center, 'final' + w.name, '<h1 class="fire" style="font-size:4vh;margin:0">GRAN GANADOR</h1>' +
+        '<div style="width:13vh;height:15vh;margin:auto">' + avatarSVG(w.avatar, 'monito bounce') + '</div>' +
+        '<div class="es pix" style="font-size:4vh">' + w.name + '</div>' +
+        '<div class="arcade neon" style="font-size:3vh">' + w.score + ' PUNTOS</div>' + boardHTML(s.board, 3))) {
       confetti();
       fxTimer = setInterval(confetti, 3000);
     }

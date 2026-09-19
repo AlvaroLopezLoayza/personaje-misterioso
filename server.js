@@ -54,7 +54,6 @@ function startRound() {
 
   const m = picked[Math.floor(Math.random() * picked.length)];
   m.wasMystery = true;
-  m.score += 75;                    // compensación de equidad
   G.nextMysteryId = null;
   G.mysteryId = m.pid;
   G.round += 1;
@@ -66,9 +65,13 @@ function startRound() {
 }
 
 function closeRound() {
+  const m = players.get(G.mysteryId);
+  // Los 75 de compensación se acreditan AL CERRAR la ronda, no al abrirla: si se
+  // suman antes, el único jugador que sube 75 puntos sin adivinar es, obviamente,
+  // el personaje misterioso, y la tabla del celular lo delata.
+  if (m) m.score += 75;
   const eligible = alive().length - 1;
   if (eligible > 0 && (G.correct.length <= 1 || G.correct.length / eligible < 0.3)) {
-    const m = players.get(G.mysteryId);
     if (m) m.score += 50;
     G.bonusMsg = '+50 PUNTOS EXTRA POR SER EL PERSONAJE MISTERIOSO!';
   }

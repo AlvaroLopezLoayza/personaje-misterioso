@@ -45,21 +45,40 @@ function setHTML(el, key, html) {
   return true;
 }
 
-// Comprime la foto en el navegador antes de enviarla (máx 800px, JPEG 0.6).
-function compressImage(file, maxW, quality) {
-  maxW = maxW || 800; quality = quality || 0.6;
+// Decodifica la foto respetando la orientación EXIF. Sin esto, las fotos
+// verticales de Android salen acostadas: drawImage ignora el EXIF, pero
+// createImageBitmap con imageOrientation sí lo aplica. El <img> queda de
+// respaldo para navegadores viejos (iOS < 15), donde Safari ya orienta solo.
+function decodeImage(file) {
+  if (window.createImageBitmap) {
+    return createImageBitmap(file, { imageOrientation: 'from-image' })
+      .catch(() => decodeViaImg(file));
+  }
+  return decodeViaImg(file);
+}
+
+function decodeViaImg(file) {
   return new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => {
-      const scale = Math.min(1, maxW / img.width);
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width * scale);
-      c.height = Math.round(img.height * scale);
-      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-      URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL('image/jpeg', quality));
-    };
-    img.onerror = () => reject(new Error('No se pudo leer la imagen'));
-    img.src = URL.createObjectURL(file);
+    const url = URL.createObjectURL(file);
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('formato no soportado')); };
+    img.src = url;
   });
+}
+
+// Comprime la foto en el navegador antes de enviarla (máx 800px, JPEG 0.6).
+async function compressImage(file, maxW, quality) {
+  maxW = maxW || 800; quality = quality || 0.6;
+  const src = await decodeImage(file);
+  const w = src.width || src.naturalWidth;
+  const h = src.height || src.naturalHeight;
+  if (!w || !h) throw new Error('imagen vacía');
+  const scale = Math.min(1, maxW / w);
+  const c = document.createElement('canvas');
+  c.width = Math.round(w * scale);
+  c.height = Math.round(h * scale);
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  if (src.close) src.close();   // libera el bitmap en Android de gama baja
+  return c.toDataURL('image/jpeg', quality);
 }

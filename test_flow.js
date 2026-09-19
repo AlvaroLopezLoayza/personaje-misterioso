@@ -82,7 +82,7 @@ function connect() { const s = io(URL, { transports: ['websocket'] }); sockets.p
   const mystery = P.find(p => p.st.last.you.isMystery);
   assert.ok(mystery, 'alguien debe ser el personaje misterioso');
   assert.strictEqual(P.filter(p => p.st.last.you.isMystery).length, 1, 'sólo uno por ronda');
-  assert.strictEqual(mystery.st.last.you.score, 75, '+75 de compensación');
+  assert.strictEqual(mystery.st.last.you.score, 0, 'la tabla no debe delatar al misterioso durante la ronda');
   const otros = P.filter(p => p !== mystery);
   // El pid del misterioso sí viaja dentro de `names` (el selector lo necesita, igual
   // que el de todos); lo que no debe existir es ningún otro campo que lo señale.
@@ -142,6 +142,7 @@ function connect() { const s = io(URL, { transports: ['websocket'] }); sockets.p
 
   // --- reconexión tras bloquear la pantalla del celular
   const pid0 = otros[0].pid;
+  const puntos0 = otros[0].st.last.you.score;   // puede haber sido misterioso en la ronda 2
   otros[0].s.close();
   await until(() => hostState.players.find(p => p.pid === pid0).online === false,
     'la LED no marcó al jugador como desconectado');
@@ -149,7 +150,8 @@ function connect() { const s = io(URL, { transports: ['websocket'] }); sockets.p
   let resumed = null;
   back.on('state', s => (resumed = s));
   await new Promise(res => back.emit('player:resume', pid0, r => { assert.ok(r.pid, 'no se pudo reanudar'); res(); }));
-  await until(() => resumed && resumed.you.score === 100, 'el puntaje no sobrevivió a la reconexión');
+  await until(() => resumed && resumed.you.score === puntos0, 'el puntaje no sobrevivió a la reconexión');
+  assert.ok(puntos0 >= 100, 'el acierto de la ronda 1 debe seguir contando');
 
   // --- reinicio deja todo en cero
   admin.emit('admin:reset');

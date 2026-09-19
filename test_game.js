@@ -18,7 +18,7 @@ seed(10);
 G.nextMysteryId = 'p1';
 startRound();
 assert.strictEqual(G.mysteryId, 'p1');
-assert.strictEqual(players.get('p1').score, 75, 'compensación de equidad');
+assert.strictEqual(players.get('p1').score, 0, 'la compensación no se acredita al abrir la ronda: delataría al misterioso');
 assert.strictEqual(G.phase, 'reveal');
 
 tick(5);
@@ -54,7 +54,7 @@ assert.strictEqual(guess('p2', 'p1'), 'sin-intentos', 'no se acierta dos veces')
 
 // --- bono de gran misterio: 3 de 9 aciertos = 33% -> sin bono
 closeRound();
-assert.strictEqual(players.get('p1').score, 75, 'sin bono con >=30%');
+assert.strictEqual(players.get('p1').score, 75, 'compensación de equidad al cerrar, sin bono con >=30%');
 assert.strictEqual(G.phase, 'board');
 
 // --- bono cuando casi nadie acierta
