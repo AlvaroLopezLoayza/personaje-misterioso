@@ -26,7 +26,7 @@ body::before {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .35) 0 2px, transparent 2px 4px);
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, .12) 0 1px, transparent 1px 4px);
   z-index: 999;
 }
 
@@ -37,9 +37,9 @@ h1, h2, .arcade { font-family: 'Press Start 2P', monospace; letter-spacing: 1px;
 .bounce { animation: bounce .55s steps(2, end) infinite alternate; }
 @keyframes bounce { from { transform: translateY(0); } to { transform: translateY(-14%); } }
 
-.neon { color: var(--neon); text-shadow: 0 0 8px var(--neon); }
-.fire { color: var(--fire); text-shadow: 0 0 8px #ff8c00; }
-.pix  { color: var(--pixel); text-shadow: 0 0 8px var(--pixel); }
+.neon { color: var(--neon); text-shadow: 0 0 4px rgba(0, 240, 255, .45); }
+.fire { color: var(--fire); text-shadow: 0 0 4px rgba(255, 140, 0, .45); }
+.pix  { color: var(--pixel); text-shadow: 0 0 4px rgba(0, 255, 102, .45); }
 
 .btn {
   font-family: 'Press Start 2P', monospace;
